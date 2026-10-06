@@ -1,0 +1,46 @@
+name: Build Plugin
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout VoxyServer-Folia
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'oracle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Clone and Build Voxy Dependency
+        run: |
+          git clone https://github.com/MCRcortex/voxy.git /tmp/voxy-client
+          cd /tmp/voxy-client
+          ./gradlew jar
+          cd $GITHUB_WORKSPACE
+          mkdir -p libs
+          cp /tmp/voxy-client/build/libs/voxy-*.jar libs/voxy.jar
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew clean build
+
+      - name: Upload Plugin Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoxyServer-Folia-Plugin
+          path: build/libs/*.jar
