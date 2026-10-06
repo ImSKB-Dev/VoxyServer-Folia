@@ -1,0 +1,16 @@
+name: VoxyServer
+version: 1.1.5-folia
+main: com.dripps.voxyserver.VoxyServerPlugin
+api-version: '1.21'
+folia-supported: true
+author: PooSmacker
+description: Server-side Voxy LOD streaming plugin for Folia
+commands:
+  voxyserver:
+    description: VoxyServer administration commands
+    permission: voxyserver.admin
+    usage: /voxyserver <import|status|cancel>
+permissions:
+  voxyserver.admin:
+    description: Allows administration of VoxyServer
+    default: op

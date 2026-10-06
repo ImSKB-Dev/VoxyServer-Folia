@@ -1,0 +1,60 @@
+plugins {
+    id 'java'
+    id 'io.papermc.paperweight.userdev' version '2.0.0-SNAPSHOT'
+}
+
+group = project.maven_group
+version = project.version
+
+repositories {
+    mavenCentral()
+    maven {
+        name = "PaperMC"
+        url = "https://repo.papermc.io/repository/maven-public/"
+    }
+    maven {
+        name = "Sonatype"
+        url = "https://oss.sonatype.org/content/repositories/snapshots/"
+    }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 25
+}
+
+dependencies {
+    paperweightDevelopmentBundle("dev.folia:dev-bundle:26.1.2.build.8-stable@zip")
+
+    compileOnly "io.netty:netty-buffer:4.1.115.Final"
+    compileOnly "io.netty:netty-common:4.1.115.Final"
+
+    implementation files("libs/voxy.jar")
+
+    implementation "org.lwjgl:lwjgl:3.3.3"
+    implementation "org.lwjgl:lwjgl:3.3.3:natives-linux"
+    implementation "org.lwjgl:lwjgl:3.3.3:natives-windows"
+    implementation "org.lwjgl:lwjgl:3.3.3:natives-macos"
+
+    testImplementation "org.junit.jupiter:junit-jupiter:5.11.4"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+    testImplementation "io.netty:netty-buffer:4.1.115.Final"
+    testImplementation "io.netty:netty-common:4.1.115.Final"
+}
+
+test {
+    useJUnitPlatform()
+}
+
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
