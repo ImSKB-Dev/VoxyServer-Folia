@@ -7,11 +7,11 @@ public interface ModMetadata {
         return () -> "1.1.5";
     }
 
-    default CustomValue getCustomValue(String key) {
-        return () -> "1.1.5-folia";
+    default boolean containsCustomValue(String key) {
+        return true;
     }
 
-    interface CustomValue {
-        String getAsString();
+    default CustomValue getCustomValue(String key) {
+        return () -> "1.1.5-folia";
     }
 }

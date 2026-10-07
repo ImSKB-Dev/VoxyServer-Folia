@@ -4,6 +4,8 @@ import net.fabricmc.api.EnvType;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Optional;
 
 public interface FabricLoader {
@@ -13,6 +15,7 @@ public interface FabricLoader {
 
     boolean isModLoaded(String id);
     Optional<ModContainer> getModContainer(String id);
+    Collection<ModContainer> getAllMods();
     EnvType getEnvironmentType();
     Path getConfigDir();
     Path getGameDir();
@@ -32,6 +35,11 @@ public interface FabricLoader {
                 return Optional.of(DUMMY_CONTAINER);
             }
             return Optional.empty();
+        }
+
+        @Override
+        public Collection<ModContainer> getAllMods() {
+            return Collections.singletonList(DUMMY_CONTAINER);
         }
 
         @Override
