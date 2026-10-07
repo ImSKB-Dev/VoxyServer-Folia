@@ -115,7 +115,7 @@ public class WorldImportCoordinator {
         }
 
         active.cancelled = true;
-        active.importer.shutdown();
+        java.util.concurrent.CompletableFuture.runAsync(active.importer::shutdown);
         sendSuccess(source, "cancelled import for " + active.dimensionId);
         return true;
     }
@@ -129,7 +129,7 @@ public class WorldImportCoordinator {
         }
         if (active != null) {
             active.cancelled = true;
-            active.importer.shutdown();
+            java.util.concurrent.CompletableFuture.runAsync(active.importer::shutdown);
         }
     }
 
