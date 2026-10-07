@@ -110,11 +110,66 @@ public class ChunkVoxelizer implements Listener {
 
         engine.markChunkPossiblyPresent(level, chunk);
 
-        boolean enqueued = engine.getIngestService().enqueueIngest(world, chunk);
+        boolean enqueued = false;
+        try {
+            enqueued = engine.getIngestService().enqueueIngest(world, chunk);
+        } catch (UnsupportedOperationException e) {
+            enqueued = fallbackRawIngest(world, chunk);
+        } catch (Throwable t) {
+            if (t.getCause() instanceof UnsupportedOperationException || (t.getMessage() != null && t.getMessage().contains("getDebugSectionType"))) {
+                enqueued = fallbackRawIngest(world, chunk);
+            } else {
+                throw t;
+            }
+        }
+
         if (!enqueued && !pendingSectionYs.isEmpty()) {
             clearPendingChunkSections(dimension, chunk, pendingSectionYs);
         }
         return enqueued;
+    }
+
+    private boolean fallbackRawIngest(WorldEngine worldEngine, LevelChunk chunk) {
+        net.minecraft.world.level.chunk.LevelChunkSection[] sections = chunk.getSections();
+        int sectionY = chunk.getMinSectionY() - 1;
+        boolean ingestedAny = false;
+        var lightEngine = chunk.getLevel().getLightEngine();
+
+        for (net.minecraft.world.level.chunk.LevelChunkSection section : sections) {
+            sectionY++;
+            if (section == null || section.hasOnlyAir()) continue;
+
+            net.minecraft.world.level.chunk.DataLayer blockLight = null;
+            net.minecraft.world.level.chunk.DataLayer skyLight = null;
+            if (lightEngine != null) {
+                try {
+                    var sectionPos = net.minecraft.core.SectionPos.of(chunk.getPos(), sectionY);
+                    var blockListener = lightEngine.getLayerListener(net.minecraft.world.level.LightLayer.BLOCK);
+                    if (blockListener != null) {
+                        blockLight = blockListener.getDataLayerData(sectionPos);
+                    }
+                    var skyListener = lightEngine.getLayerListener(net.minecraft.world.level.LightLayer.SKY);
+                    if (skyListener != null) {
+                        skyLight = skyListener.getDataLayerData(sectionPos);
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+
+            boolean ok = me.cortex.voxy.common.world.service.VoxelIngestService.rawIngest(
+                    worldEngine,
+                    section,
+                    chunk.getPos().x(),
+                    sectionY,
+                    chunk.getPos().z(),
+                    blockLight,
+                    skyLight
+            );
+            if (ok) {
+                ingestedAny = true;
+            }
+        }
+        return ingestedAny;
     }
 
     private List<Integer> markPendingChunkSections(String dimension, LevelChunk chunk) {

@@ -160,6 +160,15 @@ public class WorldImportCoordinator {
             return;
         }
 
+        worldEngine.markActive();
+        try {
+            worldEngine.acquireRef();
+        } catch (IllegalStateException e) {
+            sendFailure(request.source, "voxy world for " + request.dimensionId + " is not active");
+            this.onImportFinished(runId, null, request, false, 0);
+            return;
+        }
+
         WorldImporter importer = new WorldImporter(
                 worldEngine,
                 NmsAdapter.getHandle(request.world),
@@ -172,6 +181,9 @@ public class WorldImportCoordinator {
         synchronized (this.lock) {
             if (runId != this.activeRunId) {
                 importer.shutdown();
+                try {
+                    worldEngine.releaseRef();
+                } catch (Exception ignored) {}
                 return;
             }
             this.activeImport = active;
@@ -220,6 +232,16 @@ public class WorldImportCoordinator {
 
     private void onImportFinished(long runId, ActiveImport active, ImportRequest request, boolean completed, int totalChunks) {
         boolean cancelled = active != null && active.cancelled;
+
+        try {
+            WorldIdentifier id = ServerLodEngine.getWorldIdentifier(request.world);
+            if (id != null) {
+                var worldEngine = this.engine.getNullable(request.world);
+                if (worldEngine != null) {
+                    worldEngine.releaseRef();
+                }
+            }
+        } catch (Exception ignored) {}
 
         synchronized (this.lock) {
             if (this.activeImport != null && Objects.equals(this.activeImport, active)) {
