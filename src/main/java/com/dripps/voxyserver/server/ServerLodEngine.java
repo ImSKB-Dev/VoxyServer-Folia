@@ -32,6 +32,7 @@ public class ServerLodEngine extends VoxyInstance {
     private final Path basePath;
     private final SectionSerializationStorage.Config storageConfig;
     private final ConcurrentHashMap<WorldIdentifier, String> dimensionsByWorld = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<WorldIdentifier, WorldEngine> activeEngineCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<WorldIdentifier, StoredSectionPresenceIndex> presenceIndexes = new ConcurrentHashMap<>();
     private final ExecutorService presenceIndexExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "VoxyServer Presence Index");
@@ -78,6 +79,22 @@ public class ServerLodEngine extends VoxyInstance {
         return new WorldIdentifier(key, level.getSeed(), dim);
     }
 
+    public WorldEngine getNullable(ServerLevel level) {
+        WorldIdentifier worldId = getWorldIdentifier(level);
+        if (worldId == null) {
+            return null;
+        }
+        return activeEngineCache.get(worldId);
+    }
+
+    public WorldEngine getNullable(World world) {
+        WorldIdentifier worldId = getWorldIdentifier(world);
+        if (worldId == null) {
+            return null;
+        }
+        return activeEngineCache.get(worldId);
+    }
+
     public WorldEngine getOrCreate(World world) {
         ServerLevel level = NmsAdapter.getHandle(world);
         if (level != null) {
@@ -99,17 +116,24 @@ public class ServerLodEngine extends VoxyInstance {
         if (identifier == null || !this.isRunning()) {
             return null;
         }
+        WorldEngine cached = activeEngineCache.get(identifier);
+        if (cached != null) {
+            return cached;
+        }
+
         this.dimensionsByWorld.put(identifier, dimension);
         WorldEngine world;
         try {
             world = super.getOrCreate(identifier);
         } catch (Exception e) {
             logger.severe("Could not get or create world for " + identifier + ": " + e.getMessage());
+            e.printStackTrace();
             return null;
         }
         if (world == null) {
             return null;
         }
+        this.activeEngineCache.put(identifier, world);
         this.attachDirtyCallback(identifier, world);
         this.ensurePresenceIndex(identifier, world);
         return world;
@@ -120,16 +144,23 @@ public class ServerLodEngine extends VoxyInstance {
         if (!this.isRunning()) {
             return null;
         }
+        WorldEngine cached = activeEngineCache.get(identifier);
+        if (cached != null) {
+            return cached;
+        }
+
         WorldEngine world;
         try {
             world = super.getOrCreate(identifier);
         } catch (Exception e) {
             logger.severe("Could not get or create world for " + identifier + ": " + e.getMessage());
+            e.printStackTrace();
             return null;
         }
         if (world == null) {
             return null;
         }
+        this.activeEngineCache.put(identifier, world);
         this.attachDirtyCallback(identifier, world);
         this.ensurePresenceIndex(identifier, world);
         return world;
@@ -186,6 +217,7 @@ public class ServerLodEngine extends VoxyInstance {
 
     @Override
     public void shutdown() {
+        this.activeEngineCache.clear();
         this.presenceIndexExecutor.shutdownNow();
         try {
             this.presenceIndexExecutor.awaitTermination(5, TimeUnit.SECONDS);

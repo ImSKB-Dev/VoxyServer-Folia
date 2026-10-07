@@ -12,6 +12,8 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
+import org.bukkit.event.world.WorldLoadEvent;
+import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ChunkVoxelizer implements Listener {
     private static final long RETRY_INTERVAL_TICKS = 2L;
 
+    private final Plugin plugin;
     private final ServerLodEngine engine;
     private final LodStreamingService streamingService;
     private final boolean generateOnChunkLoad;
@@ -30,11 +33,20 @@ public class ChunkVoxelizer implements Listener {
 
     private record PendingChunk(String dimension, int chunkX, int chunkZ) {}
 
-    public ChunkVoxelizer(ServerLodEngine engine, LodStreamingService streamingService, VoxyServerConfig config) {
+    public ChunkVoxelizer(Plugin plugin, ServerLodEngine engine, LodStreamingService streamingService, VoxyServerConfig config) {
+        this.plugin = plugin;
         this.engine = engine;
         this.streamingService = streamingService;
         this.generateOnChunkLoad = config.generateOnChunkLoad;
         this.ingestOnChunkUnload = !config.dirtyTrackingEnabled;
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onWorldLoad(WorldLoadEvent event) {
+        World world = event.getWorld();
+        plugin.getServer().getAsyncScheduler().runNow(plugin, task -> {
+            engine.getOrCreate(world);
+        });
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -53,6 +65,7 @@ public class ChunkVoxelizer implements Listener {
         if (streamingService != null) {
             streamingService.onChunkLoadStateChanged(dimension, chunkX, chunkZ, true);
         }
+
         if (ingestChunk(level, levelChunk, true)) {
             pendingChunkRetries.remove(new PendingChunk(dimension, chunkX, chunkZ));
             return;
@@ -86,8 +99,11 @@ public class ChunkVoxelizer implements Listener {
     }
 
     public boolean ingestChunk(ServerLevel level, LevelChunk chunk, boolean markPendingResend) {
-        WorldEngine world = engine.getOrCreate(level);
-        if (world == null) return false;
+        WorldEngine world = engine.getNullable(level);
+        if (world == null) {
+            plugin.getServer().getAsyncScheduler().runNow(plugin, task -> engine.getOrCreate(level));
+            return false;
+        }
 
         String dimension = level.dimension().identifier().toString();
         List<Integer> pendingSectionYs = markPendingResend ? markPendingChunkSections(dimension, chunk) : List.of();

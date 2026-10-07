@@ -35,6 +35,8 @@ dependencies {
     compileOnly "io.netty:netty-buffer:4.1.115.Final"
     compileOnly "io.netty:netty-common:4.1.115.Final"
 
+    implementation "org.rocksdb:rocksdbjni:10.2.1"
+
     implementation files("libs/voxy.jar")
 
     implementation "org.lwjgl:lwjgl:3.3.3"

@@ -8,6 +8,7 @@ import com.dripps.voxyserver.server.ServerLodEngine;
 import com.dripps.voxyserver.server.VoxyServerCommands;
 import com.dripps.voxyserver.server.WorldImportCoordinator;
 import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.nio.file.Path;
@@ -41,10 +42,16 @@ public class VoxyServerPlugin extends JavaPlugin {
         lodEngine = new ServerLodEngine(dataFolder, getLogger());
         lodEngine.updateDedicatedThreadsCount(config.workerThreads);
 
+        for (World world : Bukkit.getWorlds()) {
+            Bukkit.getAsyncScheduler().runNow(this, task -> {
+                lodEngine.getOrCreate(world);
+            });
+        }
+
         streamingService = new LodStreamingService(this, lodEngine, config);
         streamingService.register();
 
-        chunkVoxelizer = new ChunkVoxelizer(lodEngine, streamingService, config);
+        chunkVoxelizer = new ChunkVoxelizer(this, lodEngine, streamingService, config);
         Bukkit.getPluginManager().registerEvents(chunkVoxelizer, this);
 
         importCoordinator = new WorldImportCoordinator(lodEngine, streamingService);
@@ -58,7 +65,7 @@ public class VoxyServerPlugin extends JavaPlugin {
                 if (dirtyTracker != null) {
                     dirtyTracker.tick();
                 }
-            }, 1, 1, TimeUnit.SECONDS);
+            }, 50, 50, TimeUnit.MILLISECONDS);
         }
 
         long tickIntervalMs = Math.max(50L, config.tickInterval * 50L);
